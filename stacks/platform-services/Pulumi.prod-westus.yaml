@@ -1,0 +1,14 @@
+# Production - West US (DR)
+config:
+  azure:location: westus
+  infrastructure:environment: prod
+  infrastructure:location: westus
+  infrastructure:clusterType: aks
+  database:redundancyLevel: "high"
+  database:isolation: shared
+  vnet:addressSpace: 10.0.0.0/16
+  aks:nodeCount: "3"
+  aks:vmSize: Standard_B2s
+  sql:skuName: "S3"
+  sql:skuTier: "Standard"
+  enableDiagnostics: "true"

@@ -1,0 +1,8 @@
+# Staging - East US
+config:
+  infrastructure:environment: staging
+  infrastructure:location: eastus
+  services:enableGrafana: "true"
+  services:enableKyverno: "true"
+  services:enableOpenSearch: "false"
+  services:enableUptimeKuma: "false"

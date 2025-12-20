@@ -1,0 +1,14 @@
+# Development - East US
+config:
+  azure:location: eastus
+  infrastructure:environment: dev
+  infrastructure:location: eastus
+  infrastructure:clusterType: aks
+  database:redundancyLevel: "low"
+  database:isolation: shared
+  vnet:addressSpace: 10.2.0.0/16
+  aks:nodeCount: "1"
+  aks:vmSize: Standard_B2s
+  sql:skuName: "S0"
+  sql:skuTier: "Standard"
+  enableDiagnostics: "false"

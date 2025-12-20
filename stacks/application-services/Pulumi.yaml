@@ -1,0 +1,11 @@
+name: application-services
+runtime: nodejs
+description: |
+  Application layer: Tenant-specific cloud resources
+  - Multi-tenant databases (shared or isolated per tenant)
+  - KeyVault per tenant
+  - Managed identities with workload identity
+  - Kubernetes namespaces and RBAC
+  - Private endpoints for zero-trust
+  
+  This stack is deployed per tenant using: app-{tenantId}-{environment}-{location}

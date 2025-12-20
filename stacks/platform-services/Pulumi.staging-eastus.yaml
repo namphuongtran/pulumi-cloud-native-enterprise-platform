@@ -1,0 +1,14 @@
+# Staging - East US
+config:
+  azure:location: eastus
+  infrastructure:environment: staging
+  infrastructure:location: eastus
+  infrastructure:clusterType: aks
+  database:redundancyLevel: "medium"
+  database:isolation: shared
+  vnet:addressSpace: 10.1.0.0/16
+  aks:nodeCount: "2"
+  aks:vmSize: Standard_B2s
+  sql:skuName: "S1"
+  sql:skuTier: "Standard"
+  enableDiagnostics: "true"

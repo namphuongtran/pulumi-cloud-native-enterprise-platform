@@ -1,0 +1,24 @@
+{
+  "name": "cloud-native-enterprise-platform",
+  "version": "1.0.0",
+  "description": "Multi-tenant, multi-region cloud-native platform with Pulumi IaC",
+  "private": true,
+  "scripts": {
+    "build": "pnpm -r build",
+    "deploy": "cd automation && pnpm run deploy",
+    "provision-tenant": "cd automation && pnpm run provision-tenant",
+    "test": "pnpm -r test"
+  },
+  "devDependencies": {
+    "@types/node": "^18",
+    "typescript": "^5.0.0",
+    "ts-node": "^10.9.0"
+  },
+  "workspaces": [
+    "packages/core",
+    "stacks/platform-services",
+    "stacks/services-addons",
+    "stacks/application-services",
+    "automation"
+  ]
+}

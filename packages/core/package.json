@@ -1,0 +1,17 @@
+{
+  "name": "@enterprise/core",
+  "version": "1.0.0",
+  "description": "Shared core library for enterprise platform",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "scripts": {
+    "build": "npx tsc"
+  },
+  "dependencies": {
+    "@pulumi/pulumi": "^3.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^18",
+    "typescript": "^5.0.0"
+  }
+}
