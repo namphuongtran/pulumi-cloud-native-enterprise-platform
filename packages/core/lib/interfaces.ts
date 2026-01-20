@@ -176,9 +176,9 @@ export interface DeploymentContext {
 }
 
 /**
- * Platform layer configuration
+ * Platform stack configuration (for existing stacks)
  */
-export interface PlatformConfig {
+export interface PlatformStackConfig {
   environment: string;
   location: string;
   clusterType: "aks" | "eks";
@@ -203,9 +203,9 @@ export interface ServicesConfig {
 }
 
 /**
- * Application layer configuration
+ * Tenant application stack configuration (for existing stacks)
  */
-export interface ApplicationConfig {
+export interface TenantAppConfig {
   tenantId: string;
   environment: string;
   location: string;
@@ -214,24 +214,6 @@ export interface ApplicationConfig {
   keyVaultSku: "standard" | "premium";
   enablePrivateEndpoints: boolean;
   enableWorkloadIdentity: boolean;
-}
-
-// ============================================================
-// ERROR HANDLING
-// ============================================================
-
-export class ConfigurationError extends Error {
-  constructor(message: string) {
-    super(`Configuration Error: ${message}`);
-    this.name = "ConfigurationError";
-  }
-}
-
-export class ValidationError extends Error {
-  constructor(message: string) {
-    super(`Validation Error: ${message}`);
-    this.name = "ValidationError";
-  }
 }
 
 // ============================================================
@@ -258,10 +240,10 @@ export function validateDeploymentContext(
 }
 
 /**
- * Validate application configuration
+ * Validate tenant application configuration
  */
-export function validateApplicationConfig(
-  config: ApplicationConfig
+export function validateTenantAppConfig(
+  config: TenantAppConfig
 ): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
 

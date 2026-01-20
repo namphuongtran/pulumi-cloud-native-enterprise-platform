@@ -1,8 +1,0 @@
-# Development - East US
-config:
-  infrastructure:environment: dev
-  infrastructure:location: eastus
-  services:enableGrafana: "true"
-  services:enableKyverno: "false"
-  services:enableOpenSearch: "false"
-  services:enableUptimeKuma: "false"

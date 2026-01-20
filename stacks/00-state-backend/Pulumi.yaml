@@ -1,0 +1,10 @@
+name: state-backend
+runtime: nodejs
+description: |
+  Phase 0: Pulumi State Backend
+  Deploys Azure Blob Storage for storing Pulumi state (stack state, resources, outputs)
+
+  This must be deployed FIRST before any other stacks.
+
+  Stack naming: {environment}-{location}
+  Example: dev-eastus, prod-eastus

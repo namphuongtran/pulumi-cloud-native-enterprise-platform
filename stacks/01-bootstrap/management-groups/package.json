@@ -1,0 +1,20 @@
+{
+  "name": "bootstrap-management-groups",
+  "version": "1.0.0",
+  "description": "Bootstrap layer: Azure Landing Zone management group hierarchy",
+  "main": "index.ts",
+  "scripts": {
+    "build": "pnpm exec tsc",
+    "preview": "pulumi preview",
+    "deploy": "pulumi up"
+  },
+  "dependencies": {
+    "@pulumi/pulumi": "^3.0.0",
+    "@pulumi/azure-native": "^3.0.0",
+    "@enterprise/core": "file:../../../packages/core"
+  },
+  "devDependencies": {
+    "@types/node": "^18",
+    "typescript": "^5.0.0"
+  }
+}

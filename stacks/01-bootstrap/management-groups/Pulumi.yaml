@@ -1,0 +1,15 @@
+name: bootstrap-management-groups
+runtime: nodejs
+description: |
+  Bootstrap Layer: Management Group Hierarchy
+
+  Creates the Azure Landing Zone management group structure following
+  Microsoft's Cloud Adoption Framework (CAF) enterprise-scale architecture.
+
+  This must be deployed AFTER state backend and BEFORE platform services.
+
+  Stack naming: bootstrap
+
+  Prerequisites:
+  - Management Group Contributor role at tenant root
+  - config/landing-zone.yaml configured

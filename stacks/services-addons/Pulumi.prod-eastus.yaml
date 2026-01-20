@@ -1,8 +1,0 @@
-# Production - East US
-config:
-  infrastructure:environment: prod
-  infrastructure:location: eastus
-  services:enableGrafana: "true"
-  services:enableKyverno: "true"
-  services:enableOpenSearch: "true"
-  services:enableUptimeKuma: "true"

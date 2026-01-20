@@ -1,0 +1,22 @@
+name: bootstrap-policies
+runtime: nodejs
+description: |
+  Bootstrap Layer: Azure Policy Assignments
+
+  Assigns Azure policies to the management group hierarchy following
+  Azure Landing Zone (ALZ) best practices from Microsoft's Cloud Adoption Framework.
+
+  Policy categories:
+  - Governance: Location restrictions, required tags
+  - Security: Defender for Cloud, encryption, network security
+  - Monitoring: Diagnostic settings
+  - Compliance: Optional security benchmarks (CIS, NIST, ISO 27001)
+
+  This must be deployed AFTER the management-groups stack.
+
+  Stack naming: bootstrap-policies
+
+  Prerequisites:
+  - Management groups stack deployed
+  - Policy Contributor role on management groups
+  - config/landing-zone.yaml configured

@@ -1,0 +1,98 @@
+# Enterprise EA Multi-Region Configuration
+#
+# Use this template for:
+# - Enterprise Agreement (EA) billing
+# - Multi-region deployments with DR
+# - Production workloads
+#
+# Copy to config/landing-zone.yaml and configure enrollment account
+
+platform:
+  organization:
+    name: enterprise                 # Short name (used in resource names, max 10 chars)
+    displayName: Enterprise Corp     # Display name for management groups
+    domain: enterprise.com           # Primary domain
+
+  billing:
+    model: EA
+    enrollmentAccountId: "/providers/Microsoft.Billing/enrollmentAccounts/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+
+  region:
+    mode: multi
+    primary: eastus
+    secondary: westus
+
+  managementGroups:
+    root: enterprise
+    includeIdentity: true            # Separate identity subscription
+    includeSandbox: true
+    includeDecommissioned: true
+
+  connectivity:
+    architecture: vwan               # Virtual WAN for enterprise scale
+    vwan:
+      sku: Standard
+      allowBranchToBranch: true
+      hubAddressPrefix: "10.0.0.0/16"
+    firewall:
+      enabled: true
+      sku: Premium                   # Premium for IDPS and TLS inspection
+      threatIntelMode: Deny
+      dnsProxy: true
+    vpn:
+      enabled: true
+      sku: VpnGw2
+      type: RouteBased
+    expressRoute:
+      enabled: false                 # Enable if using ExpressRoute
+
+  identity:
+    enabled: true
+    domainServices:
+      enabled: false                 # Enable if using Azure AD DS
+
+  management:
+    logRetentionDays: 365            # 1 year for compliance
+    enableDefender: true
+    defenderTier: Standard
+    actionGroupEmail: security@enterprise.com
+
+workloads:
+  defaults:
+    computeType: aks
+    tier: corp
+    networkIsolation: true
+
+  applications:
+    - name: payment-service
+      tier: corp
+      computeType: aks
+      environment: prod
+      aks:
+        kubernetesVersion: "1.28"
+        systemPoolSize: 3
+        systemPoolVmSize: Standard_D4s_v3
+        enablePrivateCluster: true
+        networkPlugin: azure
+        networkPolicy: calico
+      database:
+        enabled: true
+        type: postgresql
+        sku: GP_Gen5_4
+        highAvailability: true
+        geoRedundantBackup: true
+      keyVault:
+        enabled: true
+        sku: premium
+        enablePurgeProtection: true
+
+    - name: web-frontend
+      tier: online
+      computeType: container-apps
+      environment: prod
+      containerApps:
+        environmentSku: Consumption
+        zoneRedundant: true
+        internalOnly: false
+      keyVault:
+        enabled: true

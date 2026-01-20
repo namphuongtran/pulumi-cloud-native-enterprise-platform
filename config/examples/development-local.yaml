@@ -1,0 +1,78 @@
+# Development / Local Testing Configuration
+#
+# Use this template for:
+# - Local development and testing
+# - CI/CD pipeline testing
+# - Learning the platform
+#
+# Copy to config/landing-zone.yaml
+
+platform:
+  organization:
+    name: dev                        # Short prefix for dev resources
+    displayName: Development         # Display name
+
+  billing:
+    model: PAYG
+    subscriptions:
+      # Use your personal/dev subscription for both
+      management: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+      connectivity: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+
+  region:
+    mode: single
+    primary: eastus
+
+  managementGroups:
+    root: dev
+    includeIdentity: false
+    includeSandbox: false            # Skip for minimal setup
+    includeDecommissioned: false     # Skip for minimal setup
+
+  connectivity:
+    architecture: hub-spoke
+    hub:
+      addressSpace: "10.0.0.0/16"
+      subnets:
+        gateway: "10.0.0.0/24"
+        firewall: "10.0.1.0/26"
+        bastion: "10.0.2.0/26"
+        management: "10.0.3.0/24"
+    firewall:
+      enabled: false                 # Disable for cost savings
+    bastion:
+      enabled: false
+
+  management:
+    logRetentionDays: 30
+    enableDefender: false
+    defenderTier: Free
+
+workloads:
+  defaults:
+    computeType: aks
+    tier: sandbox                    # Sandbox tier for dev
+    networkIsolation: false          # Public endpoints OK for dev
+
+  applications:
+    - name: sample-app
+      tier: sandbox
+      computeType: aks
+      environment: dev
+      aks:
+        kubernetesVersion: "1.28"
+        systemPoolSize: 1            # Minimal for cost
+        systemPoolVmSize: Standard_B2s
+        enablePrivateCluster: false
+        networkPlugin: azure
+        networkPolicy: azure
+      database:
+        enabled: true
+        type: postgresql
+        sku: B_Gen5_1                # Basic tier for dev
+        storageSizeGb: 32
+        highAvailability: false
+        backupRetentionDays: 7
+      keyVault:
+        enabled: true
+        sku: standard

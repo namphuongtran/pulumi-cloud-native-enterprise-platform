@@ -1,0 +1,11 @@
+# Tenant Example: ACME - Production
+config:
+  infrastructure:tenantId: acme
+  infrastructure:environment: prod
+  infrastructure:location: eastus
+  database:isolation: isolated
+  database:skuName: "S1"
+  database:skuTier: "Standard"
+  keyvault:sku: premium
+  enablePrivateEndpoints: "true"
+  enableWorkloadIdentity: "true"

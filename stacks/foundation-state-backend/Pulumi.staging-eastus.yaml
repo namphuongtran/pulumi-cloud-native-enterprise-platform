@@ -1,5 +1,0 @@
-azure:location: eastus
-azure:clientId: ${AZURE_CLIENT_ID}
-azure:clientSecret: ${AZURE_CLIENT_SECRET}
-azure:subscriptionId: ${AZURE_SUBSCRIPTION_ID}
-azure:tenantId: ${AZURE_TENANT_ID}

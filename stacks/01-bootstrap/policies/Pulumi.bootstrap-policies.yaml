@@ -1,0 +1,8 @@
+config:
+  azure-native:location: eastus
+  # Reference to management groups stack (format: project/stack)
+  # managementGroupsStack: bootstrap-management-groups/bootstrap
+  # Enable enforcement mode (true = enforce, false = audit only)
+  enforceMode: true
+  # Enable Azure Security Benchmark initiative
+  enableSecurityBenchmark: false

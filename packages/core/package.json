@@ -5,10 +5,11 @@
   "main": "index.js",
   "types": "index.d.ts",
   "scripts": {
-    "build": "npx tsc"
+    "build": "pnpm exec tsc"
   },
   "dependencies": {
-    "@pulumi/pulumi": "^3.0.0"
+    "@pulumi/pulumi": "^3.0.0",
+    "yaml": "^2.3.0"
   },
   "devDependencies": {
     "@types/node": "^18",

@@ -1,0 +1,20 @@
+{
+  "name": "services-addons",
+  "version": "1.0.0",
+  "description": "Services layer: Kubernetes add-ons (Grafana, Kyverno, OpenSearch, Uptime Kuma)",
+  "main": "index.ts",
+  "scripts": {
+    "build": "pnpm exec tsc",
+    "preview": "pulumi preview",
+    "deploy": "pulumi up"
+  },
+  "dependencies": {
+    "@pulumi/pulumi": "^3.0.0",
+    "@pulumi/kubernetes": "^4.24.1",
+    "@enterprise/core": "file:../../packages/core"
+  },
+  "devDependencies": {
+    "@types/node": "^18",
+    "typescript": "^5.0.0"
+  }
+}

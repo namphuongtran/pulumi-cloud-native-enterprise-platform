@@ -23,6 +23,6 @@
             "@enterprise/shared-config": ["packages/shared-config"]
         }
     },
-    "include": ["packages/**/*.ts", "stacks/**/*.ts", "automation/**/*.ts"],
+    "include": ["packages/**/*.ts", "stacks/**/*.ts"],
     "exclude": ["node_modules", "dist"]
 }

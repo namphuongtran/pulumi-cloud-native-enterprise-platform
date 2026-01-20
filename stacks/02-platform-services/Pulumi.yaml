@@ -1,0 +1,14 @@
+name: platform
+runtime: nodejs
+description: |
+  Platform layer: Shared cloud infrastructure
+  - Virtual Networks with zero-trust networking
+  - AKS/EKS cluster with workload identity
+  - Shared databases with automatic failover (DR)
+  - Azure Firewall and network security
+  - Monitoring and logging (Log Analytics)
+  
+config:
+  pulumi:tags:
+    value:
+      pulumi:template: enterprise-platform

@@ -1,8 +1,0 @@
-# Production - West US (DR)
-config:
-  infrastructure:environment: prod
-  infrastructure:location: westus
-  services:enableGrafana: "true"
-  services:enableKyverno: "true"
-  services:enableOpenSearch: "true"
-  services:enableUptimeKuma: "true"

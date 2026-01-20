@@ -1,0 +1,62 @@
+# Minimal PAYG Single-Region Configuration
+#
+# Use this template for:
+# - Pay-As-You-Go (PAYG) subscriptions
+# - Single region deployments
+# - Getting started / development
+#
+# Copy to config/landing-zone.yaml and fill in subscription IDs
+
+platform:
+  organization:
+    name: contoso                    # Short name (used in resource names, max 10 chars)
+    displayName: Contoso Corp        # Display name for management groups
+    domain: contoso.com              # Primary domain (optional)
+
+  billing:
+    model: PAYG
+    subscriptions:
+      # Create these subscriptions in Azure Portal first, then add IDs here
+      management: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+      connectivity: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+      # identity: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"  # Optional
+
+  region:
+    mode: single
+    primary: eastus
+
+  managementGroups:
+    root: contoso                    # Root management group name
+    includeIdentity: false           # Skip identity management group
+    includeSandbox: true             # Include sandbox for experimentation
+    includeDecommissioned: true      # Include decommissioned for cleanup
+
+  connectivity:
+    architecture: hub-spoke          # Simpler than vWAN for small deployments
+    hub:
+      addressSpace: "10.0.0.0/16"
+      subnets:
+        gateway: "10.0.0.0/24"
+        firewall: "10.0.1.0/26"
+        bastion: "10.0.2.0/26"
+        management: "10.0.3.0/24"
+    firewall:
+      enabled: true
+      sku: Standard
+      threatIntelMode: Alert
+      dnsProxy: true
+    bastion:
+      enabled: false                 # Enable if you need VM access
+
+  management:
+    logRetentionDays: 30             # Minimum for cost savings
+    enableDefender: false            # Enable for production
+    defenderTier: Free
+
+workloads:
+  defaults:
+    computeType: aks
+    tier: corp
+    networkIsolation: true
+
+  applications: []                   # Add applications here

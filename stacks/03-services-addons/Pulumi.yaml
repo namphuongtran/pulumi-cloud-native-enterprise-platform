@@ -1,0 +1,10 @@
+name: services
+runtime: nodejs
+description: |
+  Services layer: Kubernetes cluster add-ons
+  - Grafana (monitoring and visualization)
+  - Kyverno (Kubernetes policy engine)
+  - OpenSearch (centralized logging)
+  - Uptime Kuma (service monitoring)
+  
+  Deployed as Helm charts on AKS cluster from Platform layer

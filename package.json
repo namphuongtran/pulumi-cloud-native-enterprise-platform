@@ -5,8 +5,6 @@
   "private": true,
   "scripts": {
     "build": "pnpm -r build",
-    "deploy": "cd automation && pnpm run deploy",
-    "provision-tenant": "cd automation && pnpm run provision-tenant",
     "test": "pnpm -r test"
   },
   "devDependencies": {
@@ -18,7 +16,6 @@
     "packages/core",
     "stacks/platform-services",
     "stacks/services-addons",
-    "stacks/application-services",
-    "automation"
+    "stacks/application-services"
   ]
 }
