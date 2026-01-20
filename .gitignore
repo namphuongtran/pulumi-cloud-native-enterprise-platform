@@ -1,5 +1,5 @@
 /bin/
-/node_modules/
+node_modules/
 # Pulumi State Files - NEVER commit state to version control!
 .pulumi/
 **/.pulumi/
