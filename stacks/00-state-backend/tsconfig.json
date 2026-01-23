@@ -15,12 +15,7 @@
     "sourceMap": true,
     "experimentalDecorators": true,
     "noFallthroughCasesInSwitch": true,
-    "noImplicitReturns": true,
-    "baseUrl": ".",
-    "paths": {
-      "@enterprise/core": ["../../packages/core"],
-      "@enterprise/core/*": ["../../packages/core/lib/*"]
-    }
+    "noImplicitReturns": true
   },
   "include": ["**/*.ts"],
   "exclude": ["node_modules", "dist"]

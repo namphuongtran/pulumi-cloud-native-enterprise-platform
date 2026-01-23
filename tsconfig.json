@@ -3,7 +3,6 @@
         "target": "ES2022",
         "module": "nodenext",
         "lib": ["ES2022"],
-        "ignoreDeprecations": "6.0",
         "declaration": true,
         "outDir": "./dist",
         "rootDir": "./",
@@ -16,13 +15,7 @@
         "sourceMap": true,
         "experimentalDecorators": true,
         "noFallthroughCasesInSwitch": true,
-        "noImplicitReturns": true,
-        "baseUrl": ".",
-        "paths": {
-            "@enterprise/core": ["packages/core"],
-            "@enterprise/core/*": ["packages/core/lib/*"],
-            "@enterprise/shared-config": ["packages/shared-config"]
-        }
+        "noImplicitReturns": true
     },
     "include": ["packages/**/*.ts", "stacks/**/*.ts"],
     "exclude": ["node_modules", "dist"]
