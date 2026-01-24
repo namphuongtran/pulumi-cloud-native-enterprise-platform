@@ -1,0 +1,135 @@
+# Blue/Green Production Deployment Configuration
+#
+# Use this template for:
+# - Zero-downtime production deployments
+# - Blue/Green deployment strategy
+# - Cross-region disaster recovery
+#
+# Traffic Routing Options:
+# - Azure Front Door (RECOMMENDED): Layer 7, WAF, CDN, faster failover
+# - Traffic Manager: DNS-based, simpler, cross-cloud compatible
+#
+# Deployment workflow:
+# 1. Deploy to inactive slot (e.g., green while blue is active)
+# 2. Validate deployment in green endpoint
+# 3. Update Front Door/Traffic Manager to route to green
+# 4. Keep blue as instant rollback option
+
+platform:
+  organization:
+    name: enterprise
+    displayName: Enterprise Corp
+    domain: enterprise.com
+
+  billing:
+    model: EA
+    enrollmentAccountId: "/providers/Microsoft.Billing/enrollmentAccounts/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+
+  region:
+    mode: multi
+    primary: eastus      # Blue slot region
+    secondary: westus    # Green slot region
+
+  connectivity:
+    architecture: vwan
+    firewall:
+      enabled: true
+      sku: Premium
+      threatIntelMode: Deny
+
+  management:
+    logRetentionDays: 365
+    enableDefender: true
+    defenderTier: Standard
+
+workloads:
+  defaults:
+    computeType: aks
+    tier: corp
+    networkIsolation: true
+
+  applications:
+    # Blue Production Slot
+    - name: payment-service
+      tier: corp
+      computeType: aks
+      environment: prod
+      deploymentSlot: blue          # Active production slot
+      # Traffic routing with Azure Front Door (recommended)
+      trafficRouting:
+        enabled: true
+        service: frontdoor          # Options: frontdoor (default), trafficmanager
+        frontDoor:
+          sku: Premium_AzureFrontDoor
+          enableWaf: true
+          wafMode: Prevention
+      # Alternative: Traffic Manager (uncomment to use)
+      # trafficRouting:
+      #   enabled: true
+      #   service: trafficmanager
+      #   trafficManager:
+      #     routingMethod: Priority  # Priority for active-standby
+      #     healthProbePath: /health
+      aks:
+        kubernetesVersion: "1.28"
+        systemPoolSize: 3
+        systemPoolVmSize: Standard_D4s_v3
+        enablePrivateCluster: true
+        enableWorkloadIdentity: true
+      database:
+        enabled: true
+        type: postgresql
+        sku: GP_Gen5_4
+        highAvailability: true
+        geoRedundantBackup: true
+        isolation: isolated
+      keyVault:
+        enabled: true
+        sku: premium
+        enablePurgeProtection: true
+        softDeleteRetentionDays: 90
+
+    # Green Production Slot
+    - name: payment-service
+      tier: corp
+      computeType: aks
+      environment: prod
+      deploymentSlot: green         # Standby/next deployment slot
+      aks:
+        kubernetesVersion: "1.28"
+        systemPoolSize: 3
+        systemPoolVmSize: Standard_D4s_v3
+        enablePrivateCluster: true
+        enableWorkloadIdentity: true
+      database:
+        enabled: true
+        type: postgresql
+        sku: GP_Gen5_4
+        highAvailability: true
+        geoRedundantBackup: true
+        isolation: isolated
+      keyVault:
+        enabled: true
+        sku: premium
+        enablePurgeProtection: true
+        softDeleteRetentionDays: 90
+
+# Traffic Manager Configuration (deploy separately)
+# trafficManager:
+#   profile: payment-service-tm
+#   routingMethod: Priority        # or Weighted for gradual rollout
+#   endpoints:
+#     blue:
+#       priority: 1               # Primary when active
+#       weight: 100
+#     green:
+#       priority: 2               # Secondary/standby
+#       weight: 0
+
+# Cutover Process:
+# 1. pulumi up -s prod-green      # Deploy new version to green
+# 2. Run smoke tests against green endpoint
+# 3. Update Traffic Manager to route to green
+# 4. Monitor for issues
+# 5. If issues: revert Traffic Manager to blue (instant rollback)
+# 6. If success: green becomes production, blue becomes standby

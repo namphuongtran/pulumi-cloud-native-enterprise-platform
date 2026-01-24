@@ -13,8 +13,12 @@ A step-by-step guide to deploy an enterprise-scale Azure Landing Zone using Pulu
 7. [Manual Deployment](#manual-deployment-alternative)
 8. [Deployment Phases](#deployment-phases)
 9. [Configuration](#configuration)
-10. [Common Operations](#common-operations)
-11. [Troubleshooting](#troubleshooting)
+10. [Environment Types](#environment-types)
+11. [Cluster Isolation Strategies](#cluster-isolation-strategies)
+12. [Blue/Green Deployments](#bluegreen-deployments)
+13. [PR Preview Environments](#pr-preview-environments)
+14. [Common Operations](#common-operations)
+15. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -195,7 +199,10 @@ pulumi-cloud-native-enterprise-platform/
 │   └── examples/
 │       ├── minimal-payg-single.yaml   # Simple PAYG setup
 │       ├── enterprise-ea-multi.yaml   # Enterprise multi-region
-│       └── development-local.yaml     # Development setup
+│       ├── development-local.yaml     # Development setup
+│       ├── blue-green-production.yaml # Blue/Green deployment
+│       ├── pr-preview-environment.yaml # PR preview environments
+│       └── shared-cluster-cost-optimized.yaml # Shared cluster pattern
 │
 ├── scripts/                           # Automation scripts
 │   ├── 00-prerequisites/              # Tools, Azure login, checks
@@ -878,8 +885,390 @@ workloads:
 | Environment | AKS Nodes | SQL SKU | Log Retention | Defender |
 |-------------|-----------|---------|---------------|----------|
 | dev | 1 | Basic | 7 days | Off |
-| staging | 2 | S1 | 14 days | Off |
+| test | 2 | Basic | 14 days | Off |
+| staging | 2 | S1 | 30 days | Off |
 | prod | 3+ | S3+ | 365 days | On |
+| pr-* | 1 | Basic | 1 day | Off |
+
+---
+
+## Environment Types
+
+This platform supports multiple environment types for different stages of the software lifecycle.
+
+### Available Environments
+
+| Environment | Type | Criticality | Use Case |
+|-------------|------|-------------|----------|
+| `dev` | Persistent | Low | Development and experimentation |
+| `test` | Persistent | Medium | QA and automated testing |
+| `staging` | Persistent | Medium | Pre-production validation |
+| `prod` | Persistent | Mission-critical | Production workloads |
+| `prod-blue` | Persistent | Mission-critical | Blue/Green production slot |
+| `prod-green` | Persistent | Mission-critical | Blue/Green production slot |
+| `pr` | Ephemeral | Low | PR preview environments |
+
+### Environment Hierarchy
+
+```
+                    ┌─────────────────────────────────────────┐
+                    │            ENVIRONMENTS                  │
+                    └─────────────────────────────────────────┘
+                                      │
+              ┌───────────────────────┴───────────────────────┐
+              │                                               │
+    ┌─────────▼─────────┐                       ┌─────────────▼─────────────┐
+    │    PERSISTENT     │                       │        EPHEMERAL          │
+    │   (Long-lived)    │                       │      (Short-lived)        │
+    └─────────┬─────────┘                       └─────────────┬─────────────┘
+              │                                               │
+    ┌─────────┴─────────────────────┐                   ┌─────▼─────┐
+    │                               │                   │   pr-*    │
+┌───▼───┐  ┌───────┐  ┌─────────┐  ┌▼──────────────┐    │ pr-123    │
+│  dev  │  │ test  │  │ staging │  │     prod      │    │ pr-456    │
+│       │  │       │  │         │  │ prod-blue     │    └───────────┘
+│       │  │       │  │         │  │ prod-green    │
+└───────┘  └───────┘  └─────────┘  └───────────────┘
+```
+
+### Deploying Different Environments
+
+Each environment is deployed as a separate Pulumi stack:
+
+```bash
+# Development environment
+cd stacks/02-platform-services
+pulumi stack init dev-eastus
+pulumi config set infrastructure:environment dev
+pulumi up
+
+# Test environment
+pulumi stack init test-eastus
+pulumi config set infrastructure:environment test
+pulumi up
+
+# Staging environment
+pulumi stack init staging-eastus
+pulumi config set infrastructure:environment staging
+pulumi up
+
+# Production environment
+pulumi stack init prod-eastus
+pulumi config set infrastructure:environment prod
+pulumi up
+```
+
+### Environment-Aware Resource Settings
+
+Resources are automatically configured based on environment:
+
+| Setting | dev/test/pr | staging | prod/prod-* |
+|---------|-------------|---------|-------------|
+| Log Analytics Retention | 7 days | 30 days | 365 days |
+| Key Vault Purge Protection | Disabled | Disabled | Enabled |
+| Key Vault Soft Delete | 7 days | 30 days | 90 days |
+| Resource Criticality Tag | low/medium | medium | mission-critical |
+
+---
+
+## Cluster Isolation Strategies
+
+Choose between dedicated or shared AKS clusters based on your cost vs isolation requirements.
+
+### Option 1: Dedicated Clusters (Default)
+
+Each environment gets its own AKS cluster. This provides maximum isolation.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    DEDICATED CLUSTERS (Current)                  │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐             │
+│  │ AKS-dev     │  │ AKS-staging │  │ AKS-prod    │             │
+│  │             │  │             │  │             │             │
+│  │ All dev     │  │ All staging │  │ All prod    │             │
+│  │ workloads   │  │ workloads   │  │ workloads   │             │
+│  └─────────────┘  └─────────────┘  └─────────────┘             │
+│                                                                 │
+│  Pros: Maximum isolation, simple RBAC                          │
+│  Cons: Higher cost, more clusters to manage                    │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Deploy dedicated clusters:**
+
+```bash
+# Each environment is a separate Pulumi stack
+pulumi stack init dev-eastus
+pulumi config set infrastructure:environment dev
+pulumi up
+
+pulumi stack init prod-eastus
+pulumi config set infrastructure:environment prod
+pulumi up
+```
+
+### Option 2: Shared Clusters (Cost Optimized)
+
+Multiple environments share AKS clusters using Kubernetes namespaces for isolation.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    SHARED CLUSTERS (Cost Optimized)             │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌─────────────────────────┐    ┌─────────────────────────┐    │
+│  │     AKS-NonProd         │    │       AKS-Prod          │    │
+│  │                         │    │                         │    │
+│  │  ┌─────┐ ┌──────┐      │    │  ┌──────┐ ┌───────────┐ │    │
+│  │  │ dev │ │ test │      │    │  │ prod │ │prod-blue  │ │    │
+│  │  └─────┘ └──────┘      │    │  └──────┘ └───────────┘ │    │
+│  │  ┌─────────┐ ┌──────┐  │    │  ┌───────────┐         │    │
+│  │  │ staging │ │pr-123│  │    │  │prod-green │         │    │
+│  │  └─────────┘ └──────┘  │    │  └───────────┘         │    │
+│  └─────────────────────────┘    └─────────────────────────┘    │
+│                                                                 │
+│  Pros: ~60-70% cost savings, better resource utilization       │
+│  Cons: Softer isolation, requires network policies             │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Cluster tier mapping:**
+
+| Cluster | Environments | Rationale |
+|---------|--------------|-----------|
+| **AKS-NonProd** | dev, test, staging, pr-* | All non-production workloads |
+| **AKS-Prod** | prod, prod-blue, prod-green | Production traffic only |
+
+> **Note:** Staging is in the nonprod cluster for better production isolation. The prod cluster should only handle actual production traffic.
+
+**Configuration example (see `config/examples/shared-cluster-cost-optimized.yaml`):**
+
+```yaml
+workloads:
+  applications:
+    - name: payment-service
+      environment: dev
+      clusterIsolation: shared
+      sharedCluster:
+        enabled: true
+        clusterTier: nonprod
+```
+
+### When to Use Each Strategy
+
+| Scenario | Recommended Strategy |
+|----------|---------------------|
+| Small/Medium business, cost-sensitive | Shared clusters |
+| Enterprise, strict compliance | Dedicated clusters |
+| Hostile multi-tenancy (untrusted tenants) | Dedicated clusters |
+| Single team, multiple environments | Shared clusters |
+| Different security classifications | Dedicated clusters |
+
+---
+
+## Blue/Green Deployments
+
+Blue/Green deployment enables zero-downtime production releases by maintaining two identical production environments.
+
+### Architecture
+
+```
+                     ┌─────────────────────────────────────┐
+                     │        Traffic Routing              │
+                     │  (Azure Front Door recommended)     │
+                     └─────────────────┬───────────────────┘
+                                       │
+                    ┌──────────────────┴──────────────────┐
+                    │                                     │
+              ┌─────▼─────┐                       ┌───────▼─────┐
+              │ prod-blue │                       │ prod-green  │
+              │  (active) │                       │  (standby)  │
+              │           │                       │             │
+              │  AKS      │                       │  AKS        │
+              │  SQL      │                       │  SQL        │
+              │  KeyVault │                       │  KeyVault   │
+              └───────────┘                       └─────────────┘
+```
+
+### Traffic Routing Options
+
+| Service | Layer | Features | Best For |
+|---------|-------|----------|----------|
+| **Azure Front Door** (Recommended) | 7 (HTTP) | WAF, CDN, SSL termination, instant failover | Web apps, APIs |
+| **Traffic Manager** | 4 (DNS) | Simple DNS routing, cross-cloud | Non-HTTP, hybrid |
+
+### Deploying Blue/Green
+
+**Step 1: Deploy both slots**
+
+```bash
+cd stacks/02-platform-services
+
+# Deploy blue slot
+pulumi stack init prod-blue-eastus
+pulumi config set infrastructure:environment prod
+pulumi config set infrastructure:deploymentSlot blue
+pulumi up
+
+# Deploy green slot
+pulumi stack init prod-green-eastus
+pulumi config set infrastructure:environment prod
+pulumi config set infrastructure:deploymentSlot green
+pulumi up
+```
+
+**Step 2: Configure traffic routing (Azure Front Door)**
+
+See `config/examples/blue-green-production.yaml` for full configuration.
+
+```yaml
+trafficRouting:
+  enabled: true
+  service: frontdoor              # Recommended
+  frontDoor:
+    sku: Premium_AzureFrontDoor
+    enableWaf: true
+    wafMode: Prevention
+```
+
+### Cutover Process
+
+1. **Deploy to inactive slot** (e.g., green while blue is active)
+2. **Validate** - Run smoke tests against green endpoint
+3. **Switch traffic** - Update Front Door to route to green
+4. **Monitor** - Watch for issues
+5. **Rollback if needed** - Instantly revert to blue
+
+```bash
+# Example: Switch traffic from blue to green
+az afd route update \
+  --resource-group rg-platform-prod-eastus \
+  --profile-name fd-platform-prod \
+  --endpoint-name platform \
+  --route-name default \
+  --origin-group og-prod-green
+```
+
+---
+
+## PR Preview Environments
+
+Ephemeral environments for testing pull requests before merging.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    PR PREVIEW WORKFLOW                          │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Developer           GitHub Actions          Azure              │
+│                                                                 │
+│  ┌─────────┐        ┌─────────────┐        ┌─────────────────┐ │
+│  │ Open PR │ ────►  │ on: pull_   │ ────►  │ Deploy pr-123   │ │
+│  │  #123   │        │ request     │        │ namespace       │ │
+│  └─────────┘        └─────────────┘        └─────────────────┘ │
+│                                                                 │
+│  ┌─────────┐        ┌─────────────┐        ┌─────────────────┐ │
+│  │ Merge/  │ ────►  │ on: pull_   │ ────►  │ Destroy pr-123  │ │
+│  │ Close   │        │ request:    │        │ resources       │ │
+│  │         │        │ closed      │        │                 │ │
+│  └─────────┘        └─────────────┘        └─────────────────┘ │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Manual Deployment
+
+```bash
+cd stacks/04-application-services
+
+# Create PR environment
+pulumi stack init pr-123-eastus
+pulumi config set infrastructure:environment pr
+pulumi config set infrastructure:ephemeralId "123"
+pulumi config set infrastructure:tenantId myapp
+pulumi up
+
+# ... test the PR ...
+
+# Cleanup when done
+pulumi destroy --yes
+pulumi stack rm pr-123-eastus --yes
+```
+
+### GitHub Actions Integration
+
+```yaml
+# .github/workflows/pr-preview.yml
+name: PR Preview
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  deploy-preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy PR Environment
+        run: |
+          cd stacks/04-application-services
+          pulumi stack select pr-${{ github.event.pull_request.number }}-eastus --create
+          pulumi config set infrastructure:environment pr
+          pulumi config set infrastructure:ephemeralId "${{ github.event.pull_request.number }}"
+          pulumi up --yes
+
+      - name: Comment PR with URL
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '🚀 Preview environment deployed: https://pr-${{ github.event.pull_request.number }}.preview.example.com'
+            })
+
+---
+# Cleanup workflow
+name: PR Cleanup
+
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  cleanup-preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Destroy PR Environment
+        run: |
+          cd stacks/04-application-services
+          pulumi stack select pr-${{ github.event.pull_request.number }}-eastus
+          pulumi destroy --yes
+          pulumi stack rm --yes
+```
+
+### Cost Optimization for PR Environments
+
+PR environments use minimal resources by default:
+
+| Resource | PR Setting | Production Setting |
+|----------|------------|-------------------|
+| AKS Nodes | 1 | 3+ |
+| AKS VM Size | Standard_D2s_v3 | Standard_D4s_v3 |
+| SQL SKU | Basic | S3+ |
+| Log Retention | 1 day | 365 days |
+| Purge Protection | Disabled | Enabled |
+
+See `config/examples/pr-preview-environment.yaml` for full configuration.
 
 ---
 
@@ -1035,6 +1424,9 @@ az aks get-versions --location eastus -o table
 2. **Add monitoring** - Configure alerts in Log Analytics
 3. **Enable multi-region** - Set `region.mode: multi` in config
 4. **Add workloads** - Create application stacks for your services
+5. **Set up Blue/Green** - See `config/examples/blue-green-production.yaml`
+6. **Enable PR previews** - See `config/examples/pr-preview-environment.yaml`
+7. **Optimize costs** - Consider shared clusters for non-production environments
 
 ---
 

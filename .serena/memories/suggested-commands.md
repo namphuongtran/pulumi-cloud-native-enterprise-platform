@@ -1,5 +1,20 @@
 # Suggested Commands
 
+## Quick Reference - Environment Deployment
+
+```bash
+# Deploy specific environment
+cd stacks/04-application-services
+pulumi stack select app-dev-eastus && pulumi up
+
+# Deploy blue/green production
+pulumi stack select app-prod-blue-eastus && pulumi up
+pulumi stack select app-prod-green-eastus && pulumi up
+
+# Deploy PR preview environment
+pulumi stack select app-pr-123-eastus && pulumi up
+```
+
 ## Package Management
 ```bash
 pnpm install              # Install all dependencies

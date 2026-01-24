@@ -5,7 +5,7 @@
 
 export interface TaggingContext {
   tenantId?: string;           // Only in Application layer
-  environment: string;          // prod, staging, dev
+  environment: string;          // prod, prod-blue, prod-green, staging, test, dev, pr-123
   location: string;             // eastus, westus
   costCenter?: string;          // Cost tracking
   department?: string;          // Ownership
@@ -18,6 +18,25 @@ export interface TaggingContext {
  * Generate standardized tags for resources
  * Enforces governance across all layers
  */
+
+/**
+ * Determine criticality level based on environment
+ * - prod, prod-* (blue/green): mission-critical
+ * - staging, test: medium
+ * - dev, pr-*: low
+ */
+export function getEnvironmentCriticality(environment: string): string {
+  if (environment === "prod" || environment.startsWith("prod-")) {
+    return "mission-critical";
+  } else if (environment === "pr" || environment.startsWith("pr-")) {
+    return "low";
+  } else if (environment === "staging" || environment === "test") {
+    return "medium";
+  } else {
+    return "low"; // dev and other environments
+  }
+}
+
 export function getTags(context: TaggingContext): Record<string, string> {
   const tags: Record<string, string> = {
     // REQUIRED: Governance & Multi-tenancy
@@ -54,11 +73,11 @@ export function getPlatformTags(
   owner?: string
 ): Record<string, string> {
   return getTags({
-    tenantId: undefined,  // NO TENANT
+    tenantId: undefined, // NO TENANT
     environment,
     location,
     department: "infrastructure",
-    criticality: "mission-critical",
+    criticality: getEnvironmentCriticality(environment),
     dataClassification: "internal",
     owner,
   });
@@ -74,11 +93,11 @@ export function getServicesTags(
   owner?: string
 ): Record<string, string> {
   return getTags({
-    tenantId: undefined,  // NO TENANT
+    tenantId: undefined, // NO TENANT
     environment,
     location,
     department: "platform-services",
-    criticality: "high",
+    criticality: getEnvironmentCriticality(environment),
     dataClassification: "internal",
     owner,
   });
@@ -96,12 +115,12 @@ export function getApplicationTags(
   owner?: string
 ): Record<string, string> {
   return getTags({
-    tenantId,  // HAS TENANT
+    tenantId, // HAS TENANT
     environment,
     location,
     costCenter: costCenter || tenantId,
     department: "tenant-services",
-    criticality: environment === "prod" ? "mission-critical" : "medium",
+    criticality: getEnvironmentCriticality(environment),
     dataClassification: "confidential",
     owner,
   });

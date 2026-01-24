@@ -1,0 +1,110 @@
+# PR Preview Environment Configuration
+#
+# Use this template for:
+# - Ephemeral preview environments for pull requests
+# - Automated deployment on PR creation
+# - Automatic cleanup on PR close/merge
+#
+# Each PR gets its own isolated environment for testing changes
+# before merging to main branch.
+#
+# GitHub Actions workflow example:
+#   on:
+#     pull_request:
+#       types: [opened, synchronize, reopened]
+#   jobs:
+#     deploy-preview:
+#       steps:
+#         - run: pulumi up -s pr-${{ github.event.pull_request.number }}
+#
+#   on:
+#     pull_request:
+#       types: [closed]
+#   jobs:
+#     cleanup-preview:
+#       steps:
+#         - run: pulumi destroy -s pr-${{ github.event.pull_request.number }} -y
+
+platform:
+  organization:
+    name: enterprise
+    displayName: Enterprise Corp
+    domain: enterprise.com
+
+  billing:
+    model: PAYG                     # Use PAYG for cost optimization
+    subscriptions:
+      management: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+      connectivity: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+
+  region:
+    mode: single
+    primary: eastus                 # Single region for ephemeral envs
+
+  connectivity:
+    architecture: hub-spoke         # Simpler architecture for PR envs
+    firewall:
+      enabled: false                # Disable firewall for cost savings
+
+  management:
+    logRetentionDays: 1             # Minimal retention for ephemeral
+    enableDefender: false           # Disable for cost savings
+
+workloads:
+  defaults:
+    computeType: aks
+    tier: online                    # Less restrictive policies
+    networkIsolation: false         # Simpler networking
+
+  applications:
+    - name: payment-service
+      tier: online
+      computeType: aks
+      environment: pr               # Ephemeral environment type
+      ephemeralId: "123"            # PR number (set dynamically in CI/CD)
+      # Resulting resource names: rg-payment-service-pr-123-eastus
+      aks:
+        kubernetesVersion: "1.28"
+        systemPoolSize: 1           # Minimal nodes for cost
+        systemPoolVmSize: Standard_D2s_v3
+        enablePrivateCluster: false
+        enableWorkloadIdentity: true
+        networkPlugin: azure
+      database:
+        enabled: true
+        type: postgresql
+        sku: Basic                  # Minimal SKU for testing
+        highAvailability: false
+        geoRedundantBackup: false
+        isolation: shared           # Share with other PR envs
+      keyVault:
+        enabled: true
+        sku: standard
+        enablePurgeProtection: false
+        softDeleteRetentionDays: 7
+
+# Ephemeral Environment Settings
+# ephemeralConfig:
+#   ttl: "4h"                       # Auto-destroy after 4 hours
+#   maxAgeHours: 24                 # Force cleanup after 24 hours
+#   notifyOnCreate: true            # Slack/Teams notification
+#   notifyOnDestroy: true
+
+# Cost Optimization for PR Environments:
+# - Use spot instances for AKS nodes
+# - Smallest SKU for all resources
+# - No redundancy or HA
+# - Short retention periods
+# - Automatic shutdown outside business hours
+
+# Cleanup Automation (Azure Function):
+# - Query resources with tag "environment: pr-*"
+# - Check createdDate tag against TTL
+# - Destroy stacks where TTL exceeded
+# - Run every hour via timer trigger
+
+# Security Considerations:
+# - PR environments should not have access to production data
+# - Use separate secrets/credentials for PR envs
+# - Restrict network access to internal only
+# - Apply minimal security policies (audit mode)

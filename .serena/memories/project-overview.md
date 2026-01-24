@@ -38,3 +38,19 @@ Implements Azure Landing Zone architecture patterns.
 - Path aliases: `@enterprise/core` → `packages/core`
 - ComponentResource pattern for reusable infrastructure
 - Configuration-driven architecture (billing, region, connectivity)
+
+## Environment System
+- **Base**: dev, test, staging, prod
+- **Ephemeral**: pr (with ephemeralId)
+- **Blue/Green**: prod-blue, prod-green (via deploymentSlot)
+- Helper: `isProductionClass()`, `getClusterTier()`
+
+## Cluster Isolation
+- **Dedicated** (default): One AKS cluster per environment
+- **Shared** (cost-optimized): Namespace-based multi-tenancy
+  - nonprod cluster: dev, test, staging, pr-*
+  - prod cluster: prod, prod-blue, prod-green
+
+## Traffic Routing
+- Azure Front Door (default, recommended)
+- Traffic Manager (DNS-based alternative)

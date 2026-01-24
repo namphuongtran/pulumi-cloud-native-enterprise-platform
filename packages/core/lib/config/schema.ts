@@ -5,6 +5,13 @@
  * Defaults are applied for KISS - only override what you need.
  */
 
+import {
+  Environment,
+  BaseEnvironment,
+  EphemeralEnvironment,
+  DeploymentSlot,
+} from "../interfaces";
+
 // ============================================================================
 // Billing Configuration
 // ============================================================================
@@ -44,6 +51,68 @@ export interface RegionConfig {
   mode: RegionMode;
   primary: string;
   secondary?: string; // Required if mode = "multi"
+}
+
+// ============================================================================
+// Cluster Isolation Configuration
+// ============================================================================
+
+/**
+ * Cluster isolation mode for cost vs isolation trade-off
+ * - dedicated: Each environment gets its own AKS cluster (max isolation, higher cost)
+ * - shared: Multiple environments share AKS clusters via namespaces (cost optimized)
+ */
+export type ClusterIsolationMode = "dedicated" | "shared";
+
+/**
+ * Shared cluster configuration for namespace-based multi-tenancy
+ * Follows Azure's recommended "dedicated namespace multitenancy" pattern
+ */
+export interface SharedClusterConfig {
+  /** Use shared clusters for cost optimization */
+  enabled: boolean;
+  /**
+   * Which cluster to deploy to based on environment tier
+   * - nonprod: dev, test, staging, pr-* (all non-production workloads)
+   * - prod: prod, prod-blue, prod-green (production traffic only)
+   */
+  clusterTier?: "nonprod" | "prod";
+}
+
+// ============================================================================
+// Traffic Routing Configuration (Blue/Green)
+// ============================================================================
+
+/**
+ * Global traffic routing service for blue/green deployments
+ * - frontdoor: Azure Front Door (Layer 7, WAF, CDN, faster failover) - RECOMMENDED
+ * - trafficmanager: Traffic Manager (DNS-based, simpler, cross-cloud compatible)
+ */
+export type TrafficRoutingService = "frontdoor" | "trafficmanager";
+
+/**
+ * Traffic routing configuration for blue/green deployments
+ */
+export interface TrafficRoutingConfig {
+  /** Enable traffic routing for blue/green deployments */
+  enabled: boolean;
+  /** Routing service to use (default: frontdoor) */
+  service?: TrafficRoutingService;
+  /** Front Door specific configuration */
+  frontDoor?: {
+    sku: "Standard_AzureFrontDoor" | "Premium_AzureFrontDoor";
+    /** Enable Web Application Firewall */
+    enableWaf?: boolean;
+    /** WAF policy mode */
+    wafMode?: "Detection" | "Prevention";
+  };
+  /** Traffic Manager specific configuration */
+  trafficManager?: {
+    /** Routing method */
+    routingMethod: "Priority" | "Weighted" | "Geographic" | "Performance";
+    /** Health probe path */
+    healthProbePath?: string;
+  };
 }
 
 // ============================================================================
@@ -234,7 +303,17 @@ export interface ApplicationConfig {
   name: string;
   tier?: WorkloadTier;
   computeType?: ComputeType;
-  environment?: string;
+  environment?: Environment;
+  /** Required for "pr" environment - the PR number or unique identifier */
+  ephemeralId?: string;
+  /** Blue/Green deployment slot - only valid for "prod" environment */
+  deploymentSlot?: DeploymentSlot;
+  /** Cluster isolation mode (default: dedicated) */
+  clusterIsolation?: ClusterIsolationMode;
+  /** Shared cluster configuration for namespace-based multi-tenancy */
+  sharedCluster?: SharedClusterConfig;
+  /** Traffic routing for blue/green deployments */
+  trafficRouting?: TrafficRoutingConfig;
   network?: NetworkConfig;
   aks?: AksConfig;
   appService?: AppServiceConfig;
@@ -340,3 +419,94 @@ export const DEFAULT_KEY_VAULT: KeyVaultConfig = {
   enablePurgeProtection: true,
   softDeleteRetentionDays: 90,
 };
+
+export const DEFAULT_TRAFFIC_ROUTING: TrafficRoutingConfig = {
+  enabled: false,
+  service: "frontdoor", // Front Door recommended for Layer 7 + WAF + CDN
+  frontDoor: {
+    sku: "Standard_AzureFrontDoor",
+    enableWaf: true,
+    wafMode: "Prevention",
+  },
+};
+
+export const DEFAULT_SHARED_CLUSTER: SharedClusterConfig = {
+  enabled: false, // Dedicated clusters by default for max isolation
+};
+
+// ============================================================================
+// Environment Cost Profiles
+// ============================================================================
+
+/**
+ * Cost profile for environment-specific resource sizing
+ * Enables cost optimization per environment tier
+ */
+export interface EnvironmentCostProfile {
+  aksNodeCount: number;
+  aksVmSize: string;
+  sqlSku: string;
+  logRetentionDays: number;
+  enableGeoRedundancy: boolean;
+  enableHighAvailability: boolean;
+  keyVaultSku: "standard" | "premium";
+}
+
+/**
+ * Default cost profiles per environment
+ * Override these in your configuration as needed
+ */
+export const ENVIRONMENT_COST_PROFILES: Record<Environment, EnvironmentCostProfile> = {
+  dev: {
+    aksNodeCount: 1,
+    aksVmSize: "Standard_D2s_v3",
+    sqlSku: "Basic",
+    logRetentionDays: 7,
+    enableGeoRedundancy: false,
+    enableHighAvailability: false,
+    keyVaultSku: "standard",
+  },
+  test: {
+    aksNodeCount: 2,
+    aksVmSize: "Standard_D2s_v3",
+    sqlSku: "S1",
+    logRetentionDays: 14,
+    enableGeoRedundancy: false,
+    enableHighAvailability: false,
+    keyVaultSku: "standard",
+  },
+  staging: {
+    aksNodeCount: 2,
+    aksVmSize: "Standard_D4s_v3",
+    sqlSku: "S2",
+    logRetentionDays: 30,
+    enableGeoRedundancy: false,
+    enableHighAvailability: false,
+    keyVaultSku: "standard",
+  },
+  prod: {
+    aksNodeCount: 3,
+    aksVmSize: "Standard_D4s_v3",
+    sqlSku: "S3",
+    logRetentionDays: 365,
+    enableGeoRedundancy: true,
+    enableHighAvailability: true,
+    keyVaultSku: "premium",
+  },
+  pr: {
+    aksNodeCount: 1,
+    aksVmSize: "Standard_D2s_v3",
+    sqlSku: "Basic",
+    logRetentionDays: 1,
+    enableGeoRedundancy: false,
+    enableHighAvailability: false,
+    keyVaultSku: "standard",
+  },
+};
+
+/**
+ * Get cost profile for an environment, with fallback to dev for unknown environments
+ */
+export function getEnvironmentCostProfile(environment: Environment): EnvironmentCostProfile {
+  return ENVIRONMENT_COST_PROFILES[environment] ?? ENVIRONMENT_COST_PROFILES.dev;
+}

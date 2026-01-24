@@ -8,6 +8,7 @@ import {
   getApplicationTags,
   validateTenantAppConfig,
   TenantAppConfig,
+  isProductionClass,
 } from "@enterprise/core";
 
 const config = new pulumi.Config();
@@ -111,8 +112,8 @@ const keyVault = new azure.keyvault.Vault("keyvault", {
     },
     enableRbacAuthorization: true,
     enableSoftDelete: true,
-    softDeleteRetentionInDays: environment === "prod" ? 90 : 30,
-    enablePurgeProtection: environment === "prod",
+    softDeleteRetentionInDays: isProductionClass(environment) ? 90 : 30,
+    enablePurgeProtection: isProductionClass(environment),
   },
   tags,
 }, { parent: resourceGroup });

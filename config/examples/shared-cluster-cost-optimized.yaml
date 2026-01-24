@@ -1,0 +1,235 @@
+# Shared Cluster Cost-Optimized Configuration
+#
+# Use this template for:
+# - Cost-optimized deployments (small to medium business)
+# - Namespace-based multi-tenancy within shared AKS clusters
+# - Reduced infrastructure overhead
+#
+# This pattern follows Microsoft's recommended "dedicated namespace multitenancy"
+# approach for AKS cost optimization. Instead of creating a separate AKS cluster
+# per environment, environments share clusters with namespace isolation.
+#
+# Cluster Architecture:
+#   AKS-NonProd Cluster          AKS-Prod Cluster
+#   ├── namespace: dev           ├── namespace: prod
+#   ├── namespace: test          ├── namespace: prod-blue
+#   ├── namespace: staging       └── namespace: prod-green
+#   ├── namespace: pr-123
+#   └── namespace: pr-456
+#
+# Note: Staging is in nonprod for better production isolation.
+# Prod cluster only handles actual production traffic.
+#
+# Cost Savings:
+# - ~60-70% reduction in AKS control plane costs
+# - Better node utilization through shared pools
+# - Fewer resources to manage
+#
+# Trade-offs:
+# - Softer isolation (namespace-level vs cluster-level)
+# - Requires network policies for security
+# - Shared node pool resources
+
+platform:
+  organization:
+    name: startup
+    displayName: Startup Corp
+    domain: startup.com
+
+  billing:
+    model: PAYG
+    subscriptions:
+      management: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+      connectivity: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+
+  region:
+    mode: single
+    primary: eastus
+
+  connectivity:
+    architecture: hub-spoke
+    firewall:
+      enabled: true
+      sku: Standard
+
+  management:
+    logRetentionDays: 30
+    enableDefender: true
+    defenderTier: Free        # Use Free tier for cost savings
+
+workloads:
+  defaults:
+    computeType: aks
+    tier: online
+    networkIsolation: true
+
+  # Shared AKS Clusters (deploy these first)
+  sharedClusters:
+    # Non-Production Cluster: dev, test, pr-* environments
+    - name: aks-nonprod
+      tier: nonprod
+      aks:
+        kubernetesVersion: "1.28"
+        systemPoolSize: 2
+        systemPoolVmSize: Standard_D2s_v3   # Smaller VMs for non-prod
+        userPools:
+          - name: workload
+            size: 2
+            vmSize: Standard_D2s_v3
+            enableAutoScaling: true
+            minCount: 1
+            maxCount: 5
+        enablePrivateCluster: false         # Simpler for dev/test
+        enableWorkloadIdentity: true
+        networkPlugin: azure
+        networkPolicy: calico               # Required for namespace isolation
+
+    # Production Cluster: staging, prod, prod-blue, prod-green
+    - name: aks-prod
+      tier: prod
+      aks:
+        kubernetesVersion: "1.28"
+        systemPoolSize: 3
+        systemPoolVmSize: Standard_D4s_v3   # Larger VMs for production
+        userPools:
+          - name: workload
+            size: 3
+            vmSize: Standard_D4s_v3
+            enableAutoScaling: true
+            minCount: 2
+            maxCount: 10
+        enablePrivateCluster: true          # Private for security
+        enableWorkloadIdentity: true
+        networkPlugin: azure
+        networkPolicy: calico
+
+  applications:
+    # Development Environment (deploys to aks-nonprod, namespace: dev)
+    - name: payment-service
+      tier: online
+      computeType: aks
+      environment: dev
+      clusterIsolation: shared
+      sharedCluster:
+        enabled: true
+        clusterTier: nonprod
+      database:
+        enabled: true
+        type: postgresql
+        sku: Basic
+        isolation: shared
+      keyVault:
+        enabled: true
+        sku: standard
+
+    # Test Environment (deploys to aks-nonprod, namespace: test)
+    - name: payment-service
+      tier: online
+      computeType: aks
+      environment: test
+      clusterIsolation: shared
+      sharedCluster:
+        enabled: true
+        clusterTier: nonprod
+      database:
+        enabled: true
+        type: postgresql
+        sku: Basic
+        isolation: shared
+
+    # Staging Environment (deploys to aks-nonprod, namespace: staging)
+    # Staging is in nonprod for better production isolation
+    - name: payment-service
+      tier: corp
+      computeType: aks
+      environment: staging
+      clusterIsolation: shared
+      sharedCluster:
+        enabled: true
+        clusterTier: nonprod
+      database:
+        enabled: true
+        type: postgresql
+        sku: S1
+        isolation: isolated
+      keyVault:
+        enabled: true
+        sku: standard
+
+    # Production Environment (deploys to aks-prod, namespace: prod)
+    - name: payment-service
+      tier: corp
+      computeType: aks
+      environment: prod
+      clusterIsolation: shared
+      sharedCluster:
+        enabled: true
+        clusterTier: prod
+      trafficRouting:
+        enabled: true
+        service: frontdoor          # Azure Front Door (recommended)
+        frontDoor:
+          sku: Standard_AzureFrontDoor
+          enableWaf: true
+          wafMode: Prevention
+      database:
+        enabled: true
+        type: postgresql
+        sku: GP_Gen5_2
+        highAvailability: true
+        isolation: isolated
+      keyVault:
+        enabled: true
+        sku: premium
+        enablePurgeProtection: true
+
+# PR Preview Environments
+# GitHub Actions will create these dynamically using:
+#   environment: pr
+#   ephemeralId: "${{ github.event.pull_request.number }}"
+#   clusterIsolation: shared
+#   sharedCluster:
+#     enabled: true
+#     clusterTier: nonprod
+
+# Network Policies (required for namespace isolation)
+# Deploy these to each shared cluster:
+#
+# apiVersion: networking.k8s.io/v1
+# kind: NetworkPolicy
+# metadata:
+#   name: deny-cross-namespace
+#   namespace: dev
+# spec:
+#   podSelector: {}
+#   policyTypes:
+#   - Ingress
+#   - Egress
+#   ingress:
+#   - from:
+#     - namespaceSelector:
+#         matchLabels:
+#           name: dev
+#   egress:
+#   - to:
+#     - namespaceSelector:
+#         matchLabels:
+#           name: dev
+#     - namespaceSelector:
+#         matchLabels:
+#           name: kube-system  # Allow DNS
+
+# Resource Quotas (recommended per namespace)
+#
+# apiVersion: v1
+# kind: ResourceQuota
+# metadata:
+#   name: dev-quota
+#   namespace: dev
+# spec:
+#   hard:
+#     requests.cpu: "4"
+#     requests.memory: 8Gi
+#     limits.cpu: "8"
+#     limits.memory: 16Gi
+#     pods: "20"

@@ -1,6 +1,6 @@
 import * as pulumi from "@pulumi/pulumi";
 import * as azure from "@pulumi/azure-native";
-import { platformResourceName, resourceGroupName, getPlatformTags } from "@enterprise/core";
+import { platformResourceName, resourceGroupName, getPlatformTags, isProductionClass } from "@enterprise/core";
 
 const config = new pulumi.Config();
 const azureConfig = new pulumi.Config("azure-native");
@@ -130,7 +130,7 @@ const logAnalyticsWorkspace = new azure.operationalinsights.Workspace("law", {
   workspaceName: lawName,
   location,
   sku: { name: "PerGB2018" },
-  retentionInDays: environment === "prod" ? 30 : 7,
+  retentionInDays: isProductionClass(environment) ? 30 : 7,
   tags,
 }, { parent: resourceGroup });
 
@@ -251,7 +251,7 @@ const keyVault = new azure.keyvault.Vault("keyvault", {
     enableRbacAuthorization: true,
     enableSoftDelete: true,
     softDeleteRetentionInDays: 90,
-    enablePurgeProtection: environment === "prod",
+    enablePurgeProtection: isProductionClass(environment),
   },
   tags,
 }, { parent: resourceGroup });

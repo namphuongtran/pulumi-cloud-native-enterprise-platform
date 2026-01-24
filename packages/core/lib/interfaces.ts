@@ -161,8 +161,28 @@ export interface ApplicationOutputs {
 }
 
 // ============================================================
-// CONFIGURATION INTERFACES
+// ENVIRONMENT TYPE DEFINITIONS
 // ============================================================
+
+/**
+ * Base environments - persistent, long-running environments
+ */
+export type BaseEnvironment = "dev" | "test" | "staging" | "prod";
+
+/**
+ * Ephemeral environments - short-lived, created on-demand
+ */
+export type EphemeralEnvironment = "pr";
+
+/**
+ * Combined environment type
+ */
+export type Environment = BaseEnvironment | EphemeralEnvironment;
+
+/**
+ * Blue/Green deployment slot - applicable only for production
+ */
+export type DeploymentSlot = "blue" | "green";
 
 /**
  * Deployment context passed through pipeline
@@ -170,9 +190,13 @@ export interface ApplicationOutputs {
 export interface DeploymentContext {
   org: string;
   project: string;
-  environment: "dev" | "staging" | "prod";
+  environment: Environment;
   location: "eastus" | "westus" | "northeurope" | "westeurope";
   tenantId?: string;
+  /** Required for "pr" environment - the PR number or unique identifier */
+  ephemeralId?: string;
+  /** Optional deployment slot - only valid for "prod" environment */
+  deploymentSlot?: DeploymentSlot;
 }
 
 /**
@@ -233,10 +257,95 @@ export function validateDeploymentContext(
   if (!context.environment) errors.push("environment is required");
   if (!context.location) errors.push("location is required");
 
+  // Ephemeral environment validations
+  if (context.environment === "pr" && !context.ephemeralId) {
+    errors.push("ephemeralId is required for pr environment");
+  }
+  if (context.environment !== "pr" && context.ephemeralId) {
+    errors.push("ephemeralId should only be set for pr environment");
+  }
+
+  // Deployment slot validations
+  if (context.deploymentSlot && context.environment !== "prod") {
+    errors.push("deploymentSlot is only valid for prod environment");
+  }
+
   return {
     valid: errors.length === 0,
     errors,
   };
+}
+
+
+/**
+ * Check if the environment is production-class (needs extra protection)
+ */
+export function isProductionClass(env: Environment | string): boolean {
+  return env === "prod" || env.startsWith("prod-");
+}
+
+/**
+ * Check if the environment is ephemeral (short-lived)
+ */
+export function isEphemeralEnvironment(env: Environment): boolean {
+  return env === "pr";
+}
+
+/**
+ * Compute the effective environment name for resource naming
+ * Examples:
+ * - ("prod", undefined, "blue") => "prod-blue"
+ * - ("pr", "123", undefined) => "pr-123"
+ * - ("staging", undefined, undefined) => "staging"
+ */
+export function getEffectiveEnvironmentName(
+  env: Environment,
+  ephemeralId?: string,
+  slot?: DeploymentSlot
+): string {
+  let name: string = env;
+  if (env === "pr" && ephemeralId) {
+    name = `pr-${ephemeralId}`;
+  }
+  if (slot) {
+    name = `${name}-${slot}`;
+  }
+  return name;
+}
+
+
+/**
+ * Cluster tier for shared cluster deployments
+ */
+export type ClusterTier = "nonprod" | "prod";
+
+/**
+ * Determine which shared cluster tier an environment should use
+ * - nonprod: dev, test, staging, pr-* (all non-production workloads)
+ * - prod: prod, prod-blue, prod-green (production traffic only)
+ *
+ * Staging is in nonprod for better production isolation - prod cluster
+ * should only handle actual production traffic.
+ */
+export function getClusterTier(env: Environment | string): ClusterTier {
+  // Only production workloads go to prod cluster for maximum isolation
+  if (env === "prod" || env.startsWith("prod-")) {
+    return "prod";
+  }
+  // Everything else (dev, test, staging, pr-*) goes to nonprod cluster
+  return "nonprod";
+}
+
+/**
+ * Get the Kubernetes namespace name for an environment
+ * Used in shared cluster deployments
+ */
+export function getEnvironmentNamespace(
+  env: Environment,
+  ephemeralId?: string,
+  slot?: DeploymentSlot
+): string {
+  return getEffectiveEnvironmentName(env, ephemeralId, slot);
 }
 
 /**
